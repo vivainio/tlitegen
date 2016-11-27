@@ -1,7 +1,4 @@
-﻿// Learn more about F# at http://fsharp.org
-// See the 'F# Tutorial' project for more help.
-
-open TypeLite
+﻿open TypeLite
 open TypeLite.Net4
 open TypeLite.TsModels
 open System.Reflection
@@ -9,6 +6,7 @@ open System
 open YamlDotNet.Serialization
 open System.IO
 open System.Text.RegularExpressions
+open FSharp.Collections
 
 type ModifyRules() = 
     member val strip = ResizeArray<string>() with get, set
@@ -51,32 +49,58 @@ let configureTs (ts: TypeScriptFluent) (config: TypegenConfig) =
     ts.WithMemberTypeFormatter(
         new TsMemberTypeFormatter(typeFormatFunc)) |> ignore
     
-    
 
 let filterTypes (config: TypegenConfig) = 
     let globpats = config.types
-    Seq.filter (fun (t: Type) -> RegexUt.anyReMatch globpats t.Name)    
+    Seq.filter (fun (t: Type) -> 
+        (t.IsClass) && RegexUt.anyReMatch globpats t.Name)    
 
 
-
-let parseAssembly (fname: string) (config: TypegenConfig) = 
-    let assy = Assembly.LoadFrom(fname)
-    let mutable ts = TypeScript.Definitions()
-    configureTs ts config
-
-    let types = assy.GetTypes() |> filterTypes config
-    for t in types do
-        ts <- ts.For t
-
-    let o = ts.Generate()
-    ()
-
-
+type TLGen(config: TypegenConfig) =
+    let ts = TypeScript.Definitions()
+    do configureTs ts config
+    member x.FeedAssembly fname =
+        let assy = Assembly.LoadFrom fname
+        let types = assy.GetTypes() |> filterTypes config
+        for t in types do
+            try
+                ts.For t |> ignore
+            with
+            | :? ArgumentException -> 
+                eprintfn "Bad type: %s" t.Name
+            | :? Exception ->
+                eprintfn "Unknown exception for type: %s" t.Name
+                 
+    member x.Generate() = ts.Generate()        
 
 [<EntryPoint>]
 let main argv =
-    let a = 1
-    let config = readConfig "../../../typegen.yaml" 
-    parseAssembly config.dll.[0] config 
-    0 // return an integer exit code
+    
+    //let arg = [|"../../../typegen.yaml"|]
+    //let arg = [|"TypeLite.dll"|]
    
+    let arg = argv
+    match arg with
+        | [||] -> 
+            eprintfn "Specify dll or configuration .yaml file"
+            0
+        | [|fname|] when fname.ToLower().EndsWith(".yaml") -> 
+            let config = readConfig fname
+            let tlg = TLGen(config)
+            for fname in config.dll do
+                tlg.FeedAssembly fname
+            let out = tlg.Generate()
+            printfn "%s" out
+            0
+        | [|fname|] when fname.ToLower().EndsWith(".dll") ->
+            let config = new TypegenConfig( dll = ResizeArray(argv), types=ResizeArray([".*"]))
+            let tlg = TLGen(config)
+            tlg.FeedAssembly(fname)
+            let out = tlg.Generate()
+            printfn "%s" out
+            0
+        | _ ->
+            printfn "Nothing to do. Specify either .dll or .yaml file"
+            1
+
+       
