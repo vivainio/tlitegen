@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.25920.0
+# Visual Studio 14
+VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "typer", "typer\typer.fsproj", "{4797D4F4-91BE-4A8A-B855-64309E9632C4}"
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "tlitegen", "typer\tlitegen.fsproj", "{4797D4F4-91BE-4A8A-B855-64309E9632C4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
