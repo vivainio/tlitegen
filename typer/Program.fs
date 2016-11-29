@@ -7,14 +7,19 @@ open YamlDotNet.Serialization
 open System.IO
 open System.Text.RegularExpressions
 open FSharp.Collections
+open YamlDotNet.Core
 
 type ModifyRules() = 
     member val strip = ResizeArray<string>() with get, set
     member val translate = ResizeArray<ResizeArray<string>>() with get, set
 
+type TypeSelector() = 
+    member val typename = ResizeArray<string>() with get, set
+    member val namespacename = ResizeArray<string>() with get, set
+
 type TypegenConfig() =
     member val dll = ResizeArray<string>() with get, set
-    member val types = ResizeArray<string>() with get, set
+    member val types = TypeSelector() with get, set
     member val modulenames = ModifyRules() with get, set
     member val membertypes = ModifyRules() with get, set
 
@@ -25,8 +30,15 @@ let getReader fname =
 let readConfig fname =
     let rd = new Deserializer()
     use reader = getReader fname
-    let res = rd.Deserialize<TypegenConfig> reader
-    res
+    try 
+        let res = rd.Deserialize<TypegenConfig> reader
+        Some(res)
+    with
+    | :? YamlException as e ->
+        printfn "Yaml parse error:\n%s" e.Message
+        None
+
+        
 
 let camelize (s: string) = (Char.ToLower s.[0]).ToString() + s.Substring(1)
     
@@ -50,10 +62,10 @@ let configureTs (ts: TypeScriptFluent) (config: TypegenConfig) =
         new TsMemberTypeFormatter(typeFormatFunc)) |> ignore
     
 
-let filterTypes (config: TypegenConfig) = 
-    let globpats = config.types
+let filterTypes (config: TypegenConfig) =     
     Seq.filter (fun (t: Type) -> 
-        (t.IsClass) && RegexUt.anyReMatch globpats t.Name)    
+        (t.IsClass) && 
+        ((RegexUt.anyReMatch config.types.typename t.Name) || (RegexUt.anyReMatch config.types.namespacename t.Namespace)))
 
 
 type TLGen(config: TypegenConfig) =
@@ -71,7 +83,7 @@ type TLGen(config: TypegenConfig) =
             | :? Exception ->
                 eprintfn "Unknown exception for type: %s" t.Name
                  
-    member x.Generate() = ts.Generate()        
+    member x.Generate() = ts.Generate()
 
 [<EntryPoint>]
 let main argv =
@@ -86,14 +98,17 @@ let main argv =
             0
         | [|fname|] when fname.ToLower().EndsWith(".yaml") -> 
             let config = readConfig fname
-            let tlg = TLGen(config)
-            for fname in config.dll do
-                tlg.FeedAssembly fname
-            let out = tlg.Generate()
-            printfn "%s" out
-            0
+            match config with
+            | Some config -> 
+                let tlg = TLGen(config)
+                for fname in config.dll do
+                    tlg.FeedAssembly fname
+                let out = tlg.Generate()
+                printfn "%s" out
+                0
+            | None -> 1
         | [|fname|] when fname.ToLower().EndsWith(".dll") ->
-            let config = new TypegenConfig( dll = ResizeArray(argv), types=ResizeArray([".*"]))
+            let config = new TypegenConfig( dll = ResizeArray(argv), types= TypeSelector( typename = ResizeArray([".*"])))
             let tlg = TLGen(config)
             tlg.FeedAssembly(fname)
             let out = tlg.Generate()
