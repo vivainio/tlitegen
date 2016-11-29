@@ -8,7 +8,7 @@
     <ProjectGuid>4797d4f4-91be-4a8a-b855-64309e9632c4</ProjectGuid>
     <OutputType>Exe</OutputType>
     <RootNamespace>typer</RootNamespace>
-    <AssemblyName>typer</AssemblyName>
+    <AssemblyName>tlitegen</AssemblyName>
     <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFSharpCoreVersion>4.4.1.0</TargetFSharpCoreVersion>
