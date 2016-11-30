@@ -45,15 +45,28 @@ let camelize (s: string) = (Char.ToLower s.[0]).ToString() + s.Substring(1)
 let strip needle (s: string) = s.Replace(needle, "")
 let stripMany (needles: string seq) (s: string) = Seq.fold (fun state el -> strip el state) s needles
 
+let wraps (s:string) wrapper = wrapper + s + wrapper
+
+let unionstrings names =
+    String.Join(" | ", [ for n in names -> wraps n "\""])
+
 let configureTs (ts: TypeScriptFluent) (config: TypegenConfig) =    
     let simplifyModuleName = stripMany config.modulenames.strip
-    let asTuple (rzarr: ResizeArray<'t>) = rzarr.[0], rzarr.[1]
+    let asTuple (rzarr: ResizeArray<_>) = rzarr.[0], rzarr.[1]
     let typeMapTries = Seq.map asTuple config.membertypes.translate
     let typeFormatFunc (prop: TsProperty) (s:string) =
+        let typ = prop.PropertyType.Type
         let found  = RegexUt.reMatchTries typeMapTries s
         match found with 
-            | None -> s
             | Some (_, newname) -> newname
+            | None -> 
+                if typ.IsEnum then
+                    let values = Enum.GetNames(typ)
+                    unionstrings values
+                else
+                    s
+
+                    
 
     // nice "fluent" api...
     ts.WithMemberFormatter (fun t -> camelize t.Name) |> ignore
@@ -88,10 +101,10 @@ type TLGen(config: TypegenConfig) =
 [<EntryPoint>]
 let main argv =
     
-    //let arg = [|"../../../typegen.yaml"|]
+    let arg = [|"../../../typegen.yaml"|]
     //let arg = [|"TypeLite.dll"|]
    
-    let arg = argv
+    //let arg = argv
     match arg with
         | [||] -> 
             eprintfn "Specify dll or configuration .yaml file"
